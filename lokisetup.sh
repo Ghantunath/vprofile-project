@@ -1,19 +1,54 @@
 #!/bin/bash
-mkdir -p /tmp/lok
-cd /tmp/lok
-wget https://github.com/grafana/loki/releases/latest/download/loki-linux-amd64.zip
+
+# Loki Installation Script
+# Standard paths: /etc/loki (config), /var/lib/loki (data)
+# Version: 3.5.7 (latest as of November 2025)
+
+set -e
+
+# Variables
+LOKI_VERSION="3.5.7"
+DOWNLOAD_URL="https://github.com/grafana/loki/releases/download/v${LOKI_VERSION}/loki-linux-amd64.zip"
+ZIP_FILE="loki-linux-amd64.zip"
+BINARY="loki-linux-amd64"
+WORK_DIR="/tmp/lok"
+CONFIG_DIR="/etc/loki"
+DATA_DIR="/var/lib/loki"
+BIN_DIR="/usr/local/bin"
+SERVICE_FILE="/etc/systemd/system/loki.service"
+
+# Create working directory
+mkdir -p "${WORK_DIR}"
+cd "${WORK_DIR}"
+
+# Install unzip if needed (assumes Debian/Ubuntu)
 sudo apt install unzip -y
-unzip loki-linux-amd64.zip
-sudo mv loki-linux-amd64 /usr/local/bin/loki
-sudo chmod +x /usr/local/bin/loki
+
+# Download and extract
+wget "${DOWNLOAD_URL}"
+unzip "${ZIP_FILE}"
+
+# Move binary
+sudo mv "${BINARY}" "${BIN_DIR}/loki"
+sudo chmod +x "${BIN_DIR}/loki"
+
+# Check version
 loki --version
+
+# Create group and user
 groupadd --system loki
 useradd --system --no-create-home --shell /sbin/nologin --gid loki loki
-sudo mkdir -p /var/lib/loki/chunks /var/lib/loki/rules
-sudo chown -R loki:loki /var/lib/loki
-sudo chmod -R 755 /var/lib/loki
-mkdir -p /etc/loki/
-cat <<EOF > /etc/loki/config.yml
+
+# Create data directories
+sudo mkdir -p "${DATA_DIR}/chunks" "${DATA_DIR}/rules"
+sudo chown -R loki:loki "${DATA_DIR}"
+sudo chmod -R 755 "${DATA_DIR}"
+
+# Create config directory
+sudo mkdir -p "${CONFIG_DIR}"
+
+# Create config file
+sudo cat <<EOF > "${CONFIG_DIR}/config.yml"
 auth_enabled: false
 
 server:
@@ -44,8 +79,11 @@ limits_config:
   allow_structured_metadata: false
 EOF
 
+# Set ownership for config
+sudo chown -R loki:loki "${CONFIG_DIR}"
 
-cat <<EOF > /etc/systemd/system/loki.service
+# Create systemd service file
+sudo cat <<EOF > "${SERVICE_FILE}"
 [Unit]
 Description=Loki Log Aggregation
 After=network.target
@@ -62,15 +100,17 @@ LimitNOFILE=65536
 WantedBy=multi-user.target
 EOF
 
+# Allow firewall port
 sudo ufw allow 3100/tcp
 
+# Reload and start service
 sudo systemctl daemon-reload
 sudo systemctl enable loki
 sudo systemctl start loki
 sudo systemctl status loki --no-pager
 
+# Wait and verify
 sleep 100
 curl http://localhost:3100/ready
 
 curl -s http://localhost:3100/metrics | grep loki_build_info
-
