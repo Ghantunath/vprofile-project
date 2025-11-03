@@ -235,7 +235,7 @@ echo "Allowing SSH (22), Node Exporter (9100), Loki (3100), and Flask app (80) t
 ufw allow 22/tcp
 ufw allow 9100/tcp
 ufw allow 3100/tcp
-ufw allow 80/tcp
+ufw allow 5000/tcp
 
 # Enable UFW (force yes)
 echo "Enabling UFW..."
