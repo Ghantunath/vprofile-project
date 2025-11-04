@@ -110,7 +110,7 @@ sudo systemctl start loki
 sudo systemctl status loki --no-pager
 
 # Wait and verify
-sleep 100
+sleep 120
 curl http://localhost:3100/ready
 
 curl -s http://localhost:3100/metrics | grep loki_build_info

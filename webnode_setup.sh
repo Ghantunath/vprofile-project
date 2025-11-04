@@ -7,7 +7,7 @@
 #   2. Node Exporter (for Prometheus)
 #   3. Titan App as a Service
 #   4. Load generation scripts
-#   5. Promtail (for Loki log collection)
+#   5. Alloy (for metrics & logs collection)
 #   6. Final Summary
 #
 #  Author: HKH Admin
@@ -165,67 +165,89 @@ nohup /usr/local/bin/generate_multi_logs.sh > /dev/null 2>&1 &
 echo "✅ Load generation setup completed."
 
 #-------------------------------------------------------------
-# 5. Install and Configure Promtail (Loki Agent)
+# 5. Install and Configure Alloy (Metrics & Logs)
 #-------------------------------------------------------------
-echo "===== [5/6] Installing Promtail (Loki log collector) ====="
-cd /tmp/exporter
+echo "===== [5/6] Installing Grafana Alloy (metrics & log collector) ====="
+sudo apt install -y gpg
+sudo mkdir -p /etc/apt/keyrings/
+wget -q -O - https://apt.grafana.com/gpg.key | gpg --dearmor | sudo tee /etc/apt/keyrings/grafana.gpg > /dev/null
+echo "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main" | sudo tee /etc/apt/sources.list.d/grafana.list
+sudo apt-get update
+sudo apt-get install -y alloy
 
-PROMTAIL_VERSION="3.5.7"
-echo "Downloading Promtail v${PROMTAIL_VERSION}..."
-wget -q https://github.com/grafana/loki/releases/download/v${PROMTAIL_VERSION}/promtail-linux-amd64.zip
+cat <<EOF > /etc/alloy/config.alloy
+// Metrics scraping and remote write to Prometheus
 
-echo "Extracting Promtail..."
-unzip -q promtail-linux-amd64.zip
+prometheus.remote_write "default" {
+  endpoint {
+    url = "http://PrometheusIP:9090/api/v1/write"
+  }
+}
 
-echo "Moving Promtail binary to /usr/local/bin..."
-mv promtail-linux-amd64 /usr/local/bin/promtail
-chmod +x /usr/local/bin/promtail
+prometheus.scrape "metrics_5000" {
+  targets = [{
+    __address__ = "localhost:5000",
+    __metrics_path__ = "/metrics",
+  }]
+  forward_to = [prometheus.remote_write.default.receiver]
+}
 
-echo "Creating Promtail config directory and config.yml..."
-mkdir -p /etc/promtail
-cat <<EOF > /etc/promtail/config.yml
-server:
-  http_listen_port: 9080
-  grpc_listen_port: 0
+prometheus.scrape "metrics_default" {
+  targets = [{
+    __address__ = "localhost:8080",  // Adjust port if different; assuming 8080 for /metrics endpoint
+    __metrics_path__ = "/metrics",
+  }]
+  forward_to = [prometheus.remote_write.default.receiver]
+}
 
-positions:
-  filename: /tmp/positions.yaml
+// Log collection from files and push to Loki
 
-clients:
-  - url: http://lokiIPaddress:3100/loki/api/v1/push
+local.file_match "titan_logs" {
+  path_targets = [{
+    __path__ = "/var/log/titan/*.log",
+    job      = "titan",
+    hostname = constants.hostname,
+  }]
+  sync_period = "5s"
+}
 
-scrape_configs:
-  - job_name: varlogs
-    static_configs:
-      - targets:
-          - localhost
-        labels:
-          job: varlogs
-          host: node1
-          env: Prod
-          __path__: /var/log/apache2/*.log
+loki.source.file "log_scrape" {
+  targets       = local.file_match.titan_logs.targets
+  forward_to    = [loki.write.loki.receiver]
+  tail_from_end = true
+}
+
+loki.write "loki" {
+  endpoint {
+    url = "http://LokiIP:3100/loki/api/v1/push"
+  }
+}
 EOF
 
-echo "Creating Promtail systemd service..."
-cat <<EOF > /etc/systemd/system/promtail.service
-[Unit]
-Description=Loki Promtail
-After=network.target
+cat <<EOF > /etc/default/alloy
+## Path:
+## Description: Grafana Alloy settings
+## Type:        string
+## Default:     ""
+## ServiceRestart: alloy
+#
+# Command line options for Alloy.
+#
+# The configuration file holding the Alloy config.
+CONFIG_FILE="/etc/alloy/config.alloy"
 
-[Service]
-ExecStart=/usr/local/bin/promtail -config.file=/etc/promtail/config.yml
-Restart=always
+# User-defined arguments to pass to the run command.
+CUSTOM_ARGS="--server.http.listen-addr=0.0.0.0:12345"
 
-[Install]
-WantedBy=default.target
+# Restart on system upgrade. Defaults to true.
+RESTART_ON_UPGRADE=true
 EOF
 
-echo "Enabling and starting Promtail service..."
-systemctl daemon-reload
-systemctl enable --now promtail
-systemctl status promtail --no-pager
-
-echo "✅ Promtail setup completed."
+systemctl restart alloy
+systemctl enable alloy
+sleep 40
+systemctl status alloy --no-pager
+echo "✅ Alloy setup completed."
 
 #-------------------------------------------------------------
 # 7. Configure UFW Firewall
@@ -241,6 +263,8 @@ ufw allow 22/tcp
 ufw allow 9100/tcp
 ufw allow 3100/tcp
 ufw allow 5000/tcp
+ufw allow 12345/tcp
+
 
 # Enable UFW (force yes)
 echo "Enabling UFW..."
@@ -257,5 +281,6 @@ echo "🎉  Setup completed successfully!"
 echo "-------------------------------------------------------------"
 echo " Node Exporter  : Running on port 9100"
 echo " Apache Website : Available at http://$(hostname -I | awk '{print $1}')"
-echo " Promtail Logs  : Forwarding to Loki at lokiIPaddress:3100"
+echo " Alloy Metrics  : Forwarding to Prometheus at PrometheusIP:9090"
+echo " Alloy Logs     : Forwarding to Loki at LokiIP:3100"
 echo "============================================================="
