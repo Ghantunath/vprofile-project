@@ -73,7 +73,8 @@ ExecStart=/usr/local/bin/prometheus \\
   --storage.tsdb.path=/var/lib/prometheus \\
   --web.console.templates=/etc/prometheus/consoles \\
   --web.console.libraries=/etc/prometheus/console_libraries \\
-  --web.listen-address=0.0.0.0:9090
+  --web.listen-address=0.0.0.0:9090 \\
+  --web.enable-remote-write-receiver
 
 SyslogIdentifier=prometheus
 Restart=always
