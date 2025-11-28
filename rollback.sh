@@ -1,23 +1,10 @@
 #!/bin/bash
 set -e
 
-# ────────────────────────────────
-# 1. STUDENT CONFIGURATION SECTION (ONLY EDIT HERE)
-# ────────────────────────────────
-PROJECT_ID="<GCPprojectName>"          # Your GCP project ID
-REGION="us-central1"                   # Region for all resources
-ZONE="${REGION}-a"                     # Zone (derived from region)
+PROJECT_ID="vprofile-478802"
+REGION="us-central1"
+ZONE="${REGION}-a"
 
-APP_NAME="vprofile"                    # Application name
-DOMAIN="<YourDomainName>"              # Your real domain for SSL
-SUBDOMAIN="vprogcp"                    # Final public URL: vprogcp.hkhinfotek.xyz
-
-
-
-
-# ────────────────────────────────
-# 2. CLEAN & CONSISTENT NAMING (DO NOT CHANGE)
-# ────────────────────────────────
 VPC="vprofile-vpc"
 
 PUB_SUBNET_01="public-01"
@@ -31,6 +18,7 @@ NAT="vprofile-nat"
 BASTION="bastion"
 DB="vprofile-db"
 MEMCACHE="vprofile-memcache"
+
 GOLDEN="vprofile-golden"
 SNAPSHOT="vprofile-snapshot"
 IMAGE="vprofile-image"
@@ -48,10 +36,9 @@ HTTP_LB="vprofile-http-lb"
 HTTPS_LB="vprofile-https-lb"
 
 PRIVATE_ZONE="vprofile-private"
-PRIVATE_DNS="vprofile.local"
 
-
-PSA_RANGE="google-psa-range"
+SUBDOMAIN="vprogcp"
+DOMAIN="hkhinfotek.xyz"
 
 echo "Setting project..."
 gcloud config set project "$PROJECT_ID" --quiet
@@ -188,22 +175,13 @@ gcloud compute networks subnets delete "$PUB_SUBNET_02" --region="$REGION" --qui
 gcloud compute networks subnets delete "$PRIV_SUBNET_01" --region="$REGION" --quiet || true
 gcloud compute networks subnets delete "$PRIV_SUBNET_02" --region="$REGION" --quiet || true
 
-
 # ============================================================
-#   10. DELETE PRIVATE SERVICE ACCESS RANGE & VPC PEERING
+#   10. DELETE PRIVATE SERVICE ACCESS RANGE 
 # ============================================================
-
-echo "Deleting VPC peering..."
-gcloud services vpc-peerings delete \
-    --service=servicenetworking.googleapis.com \
-    --network="$VPC" \
-    --quiet 
-
 echo "Deleting PSA allocated range..."
-gcloud compute addresses delete "$PSA_RANGE" --global --quiet
-
-
-
+gcloud compute addresses delete google-psa-range \
+    --global \
+    --quiet
 # ============================================================
 #   11. DELETE SSL CERT + DNS AUTH + CERT MAP
 # ============================================================
@@ -222,15 +200,25 @@ echo "Deleting DNS authorization..."
 gcloud certificate-manager dns-authorizations delete auth-"$SUBDOMAIN" --quiet || true
 
 
+#echo "Deleting VPC peering..."
+#gcloud services vpc-peerings delete \
+#    --service=servicenetworking.googleapis.com \
+#    --network="$VPC" \
+#    --quiet 
+
+
+
+
+
 # ============================================================
 #   12. DELETE VPC
 # ============================================================
 
-echo "Deleting VPC..."
-gcloud compute networks delete "$VPC" --quiet || true
+#echo "Deleting VPC..."
+#gcloud compute networks delete "$VPC" --quiet || true
 
 
 echo ""
 echo "================================================="
 echo "🔥 FULL ROLLBACK COMPLETED SUCCESSFULLY"
-echo "================================================="
+echo "
