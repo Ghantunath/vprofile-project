@@ -282,6 +282,18 @@ gcloud compute instance-groups managed create "$MIG" \
     --quiet
 
 # ────────────────────────────────────────────────────────────────
+# 23a. Enable autoscaling on MIG based on CPU utilization
+# ────────────────────────────────────────────────────────────────
+echo "Enabling autoscaling on MIG (min=2, max=10, target CPU=60%)"
+gcloud compute instance-groups managed set-autoscaling "$MIG" \
+    --zone="$ZONE" \
+    --max-num-replicas=4 \
+    --min-num-replicas=2 \
+    --target-cpu-utilization=0.6 \
+    --target-load-balancing-utilization=0.8 \
+    --quiet
+
+# ────────────────────────────────────────────────────────────────
 # 24. Set named port so load balancer knows port 8080 = http
 # ────────────────────────────────────────────────────────────────
 echo "Setting named ports for MIG"
