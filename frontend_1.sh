@@ -179,8 +179,8 @@ Environment="JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64"
 Environment="CATALINA_PID=/tmp/tomcat.pid"
 Environment="CATALINA_HOME=/usr/local/tomcat"
 Environment="CATALINA_BASE=/usr/local/tomcat"
-ExecStart=/usr/local/tomcat/bin/startup.sh
-ExecStop=/usr/local/tomcat/bin/shutdown.sh
+ExecStart=/usr/local/tomcat/bin/catalina.sh run
+ExecStop=/usr/local/tomcat/bin/catalina.sh stop 15 -force
 RestartSec=10
 Restart=always
 
